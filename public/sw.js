@@ -2,7 +2,7 @@
 // script/style the page references, so the app works offline from the very
 // first visit. User data lives in IndexedDB and is never touched here.
 // Bump VERSION on every release so old caches are dropped.
-const VERSION = 'pattern-v2';
+const VERSION = 'pattern-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (event) => {

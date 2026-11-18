@@ -28,8 +28,12 @@ export function TextArea({ minRows = 2, className = '', ...p }: TextareaHTMLAttr
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = Math.max(el.scrollHeight + 2, minRows * 24 + 20) + 'px';
+    // Grow to fit content. Only ever grow while editing: shrinking the box
+    // first (the usual trick) makes the page and on-screen keyboard jump on
+    // every keystroke, which on phones can lock up typing.
+    const min = minRows * 24 + 20;
+    if (!el.style.height) el.style.height = min + 'px';
+    if (el.scrollHeight > el.clientHeight) el.style.height = el.scrollHeight + 2 + 'px';
   }, [p.value, minRows]);
   return <textarea ref={ref} rows={minRows} dir="auto" {...p} className={`input resize-none leading-6 ${className}`} />;
 }
@@ -194,22 +198,27 @@ export function Segmented<T extends string>({ value, options, onChange, size = '
 }
 
 export function Sheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
+  // Keep the latest onClose in a ref so the effect below runs only when the
+  // sheet opens or closes — not on every keystroke inside it.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
-    const on = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const on = (e: KeyboardEvent) => e.key === 'Escape' && closeRef.current();
     window.addEventListener('keydown', on);
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { window.removeEventListener('keydown', on); document.body.style.overflow = ''; };
-  }, [open, onClose]);
+    return () => { window.removeEventListener('keydown', on); document.body.style.overflow = prevOverflow; };
+  }, [open]);
   if (!open) return null;
   return (
-    <div className="anim-fade fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={title} className="anim-up flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-xl dark:bg-stone-900 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="anim-fade fixed inset-0 z-40 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={() => closeRef.current()}>
+      <div role="dialog" aria-modal="true" aria-label={title} className="anim-up flex max-h-[92vh] max-h-[92dvh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-xl dark:bg-stone-900 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5 dark:border-stone-800">
           <h2 className="font-semibold">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="-mr-2 rounded-lg p-2 text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"><Icon name="x" /></button>
+          <button onClick={() => closeRef.current()} aria-label="Close" className="-mr-2 rounded-lg p-2 text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"><Icon name="x" /></button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
         {footer && <div className="flex justify-end gap-2 border-t border-stone-100 px-5 py-3 safe-bottom dark:border-stone-800">{footer}</div>}
       </div>
     </div>
